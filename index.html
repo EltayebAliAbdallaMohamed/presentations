@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Web Presentation</title>
+
+<style>
+  :root{
+    --stage:#0f172a;
+    --accent:#2a6df4;
+    --muted:#5b6475;
+    --shadow: 0 18px 55px rgba(0,0,0,.45);
+  }
+
+  /* PowerPoint-like slideshow background */
+  body{
+    margin:0;
+    font-family: "Segoe UI", Calibri, Arial, sans-serif;
+    background: radial-gradient(1200px 700px at 30% 20%, #1b2a57, var(--stage));
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    height:100vh;
+    overflow:hidden;
+  }
+
+  /* 16:9 slide (PowerPoint feel) */
+  .slide-container{
+    width: min(1200px, 96vw);
+    aspect-ratio: 16 / 9;
+    height: auto; /* aspect-ratio controls height */
+    background:white;
+    border-radius:10px;
+    box-shadow: var(--shadow);
+    padding:48px 64px 56px 64px;
+    position:relative;
+    display:none;
+    overflow:auto;
+  }
+
+  /* top accent bar like PPT theme */
+  .slide-container::before{
+    content:"";
+    position:absolute;
+    left:0;
+    top:0;
+    height:10px;
+    width:100%;
+    background: linear-gradient(90deg, var(--accent), #70a1ff);
+  }
+
+  p{
+    direction: ltr;
+    text-align: left;
+  }
+
+  .slide-container.active{
+    display:block;
+  }
+
+  .logo{
+    width:110px;
+    position:absolute;
+    top:18px;
+    left:18px;
+  }
+
+  .slide-title{
+    font-size:38px;
+    font-weight:700;
+    text-align:center;
+    margin-top:10px;
+    color:#0b1220;
+  }
+
+  .question{
+    color: var(--accent);
+    text-align:center;
+    font-size:20px;
+    font-weight:600;
+  }
+
+  details{
+    margin-top:18px;
+    font-size:20px;
+  }
+  details > summary{
+    cursor:pointer;
+    font-weight:600;
+  }
+
+  ol, ul{
+    margin-top:12px;
+    line-height:1.75;
+  }
+
+  hr{
+    border:0;
+    height:1px;
+    background:#e7eaf0;
+    margin:14px 0;
+  }
+
+  .footer{
+    position:absolute;
+    bottom:18px;
+    left:64px;
+    font-size:14px;
+    color: var(--muted);
+  }
+
+  .slide-number{
+    position:absolute;
+    bottom:18px;
+    right:64px;
+    font-size:14px;
+    color: var(--muted);
+  }
+
+  /* Presenter controls (fixed, like slideshow UI) */
+  .controls{
+    position:fixed;
+    left:50%;
+    bottom:18px;
+    transform:translateX(-50%);
+    display:flex;
+    gap:10px;
+    align-items:center;
+    background: rgba(0,0,0,.45);
+    border: 1px solid rgba(255,255,255,.12);
+    backdrop-filter: blur(10px);
+    padding:10px 12px;
+    border-radius:12px;
+    z-index: 10;
+  }
+
+  button{
+    padding:10px 12px;
+    font-size:14px;
+    border:none;
+    border-radius:10px;
+    cursor:pointer;
+    background: rgba(255,255,255,.12);
+    color:white;
+    font-weight:600;
+  }
+  button:hover{ background: rgba(255,255,255,.18); }
+  button:focus{ outline:3px solid #ffbf47; outline-offset:2px; }
+
+  .jump{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    color: rgba(255,255,255,.9);
+    font-size:13px;
+    font-weight:600;
+    padding-left:4px;
+  }
+
+  .jump input{
+    width:260px;
+    max-width:44vw;
+    padding:10px 12px;
+    border-radius:10px;
+    border: 1px solid rgba(255,255,255,.18);
+    background: rgba(255,255,255,.10);
+    color:white;
+    font-size:14px;
+    outline:none;
+  }
+  .jump input::placeholder{ color: rgba(255,255,255,.65); }
+
+  .hint{
+    font-size:12px;
+    color: rgba(255,255,255,.75);
+    white-space: nowrap;
+  }
+
+  /* Progress bar */
+  .progress{
+    position:fixed;
+    left:0;
+    bottom:0;
+    height:4px;
+    width:100%;
+    background: rgba(255,255,255,.12);
+    z-index: 9;
+  }
+  .progress > div{
+    height:100%;
+    width:0%;
+    background: linear-gradient(90deg, var(--accent), #70a1ff);
+    transition: width 160ms ease;
+  }
+
+  /* Toast message */
+  .toast{
+    position:fixed;
+    left:50%;
+    top:18px;
+    transform:translateX(-50%);
+    background: rgba(0,0,0,.55);
+    border: 1px solid rgba(255,255,255,.14);
+    padding:10px 12px;
+    border-radius:12px;
+    backdrop-filter: blur(10px);
+    display:none;
+    z-index: 20;
+    color:white;
+    font-weight:600;
+  }
+  .toast.show{ display:block; }
+
+  /* Mobile */
+  @media screen and (max-width:768px){
+    .slide-container{
+      width:95%;
+      height:90vh;   /* fallback on small screens */
+      aspect-ratio:auto;
+      padding:34px 28px 52px 28px;
+    }
+    .slide-title{ font-size:28px; }
+    details{ font-size:17px; }
+    .logo{ width:78px; top:10px; left:10px; }
+    .footer{ left:28px; }
+    .slide-number{ right:28px; }
+  }
+</style>
+</head>
+
+<body>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- ===== SLIDE 1 (Content corrected for accuracy) ===== -->
+<div class="slide-container active" data-title="Vision Measurement">
+  <img src="ksu_logo.png" class="logo" alt="KSU logo">
+
+  <p class="slide-title">Visual Impairment – Vision Measurement</p>
+  <hr>
+
+  <p class="question">
+    What do you know about learners with SEN, specifically HI and VI?
+  </p>
+  <hr>
+
+  <details>
+    <summary>Slide 1</summary>
+    <ul>
+      <li><p>Vision is often described using the <strong>Snellen fraction</strong> (e.g., 6/6 or 20/20).</p></li>
+      <li><p><strong>6/6 (20/20)</strong> = typical “normal” visual acuity.</p></li>
+      <li><p><strong>6/4</strong> = better than average acuity: you can see at 6 m what typical vision sees at 4 m.</p></li>
+      <li><p><strong>6/12</strong> = reduced acuity: you must be at 6 m to see what typical vision can see at 12 m.</p></li>
+    </ul>
+  </details>
+
+  <div class="footer">Presented by: Eltayeb Ali Abdalla Mohamed – SEN Teacher</div>
+  <div class="slide-number"></div>
+</div>
+
+<!-- ===== SLIDE 2 (Content corrected for accuracy) ===== -->
+<div class="slide-container" data-title="Understanding Vision Ratios">
+  <img src="ksu_logo.png" class="logo" alt="KSU logo">
+
+  <p class="slide-title">Understanding Vision Ratios</p>
+  <hr>
+
+  <p class="question">
+    Visual Acuity is expressed as a ratio. Explain the ratio to the audience.
+  </p>
+  <hr>
+
+  <details>
+    <summary>Slide 2</summary>
+    <ol>
+      <li><p>The first number = the test distance (often 6 meters; in the U.S. often 20 feet).</p></li>
+      <li><p>The second number = the distance at which a person with typical vision can read the same line.</p></li>
+      <li><p><strong>LP</strong> = Light Perception.</p></li>
+      <li><p><strong>NLP</strong> = No Light Perception.</p></li>
+    </ol>
+  </details>
+
+  <div class="footer">Presented by: Eltayeb Ali Abdalla Mohamed – SEN Teacher</div>
+  <div class="slide-number"></div>
+</div>
+
+<!-- ===== SLIDE 3 (Ranges corrected) ===== -->
+<div class="slide-container" data-title="Hearing Impairment Measurement">
+  <img src="ksu_logo.png" class="logo" alt="KSU logo">
+
+  <p class="slide-title">Hearing Impairment Measurement</p>
+  <hr>
+
+  <p class="question">
+    How is hearing impairment measured?
+  </p>
+  <hr>
+
+  <details>
+    <summary>Slide 3</summary>
+    <ul>
+      <li><p>Hearing level is often described in <strong>decibels (dB HL)</strong> using audiometry.</p></li>
+      <li><p><strong>0–20 dB</strong> = typical hearing range</p></li>
+      <li><p><strong>21–40 dB</strong> = mild hearing loss</p></li>
+      <li><p><strong>41–70 dB</strong> = moderate hearing loss</p></li>
+      <li><p><strong>71–90 dB</strong> = severe hearing loss</p></li>
+      <li><p><strong>91+ dB</strong> = profound hearing loss</p></li>
+    </ul>
+  </details>
+
+  <div class="footer">Presented by: Eltayeb Ali Abdalla Mohamed – SEN Teacher</div>
+  <div class="slide-number"></div>
+</div>
+
+<!-- ===== SLIDE 4 (Minor wording accuracy) ===== -->
+<div class="slide-container" data-title="SEN Diversity">
+  <img src="ksu_logo.png" class="logo" alt="KSU logo">
+
+  <p class="slide-title">SEN - Diversity</p>
+  <hr>
+
+  <p class="question">
+    How diverse is this group?
+  </p>
+  <hr>
+
+  <details>
+    <summary>Slide 4</summary>
+    <ul>
+      <li><p><strong>Autism Spectrum Disorder (ASD):</strong> may affect communication and social interaction.</p></li>
+      <li><p><strong>Attention-Deficit / Hyperactivity Disorder (ADHD):</strong> inattention and/or hyperactivity‑impulsivity.</p></li>
+      <li><p><strong>Specific Learning Disability:</strong> difficulties in reading, writing, or mathematics (varies by learner).</p></li>
+      <li><p><strong>Down syndrome (Trisomy 21):</strong> genetic condition that may affect physical growth and intellectual development.</p></li>
+    </ul>
+  </details>
+
+  <div class="footer">Presented by: Eltayeb Ali Abdalla Mohamed – SEN Teacher</div>
+  <div class="slide-number"></div>
+</div>
+
+<!-- ===== SLIDE 5 (Content accuracy improved) ===== -->
+<div class="slide-container" data-title="VLC Media Player">
+  <img src="ksu_logo.png" class="logo" alt="KSU logo">
+
+  <p class="slide-title">VLC Media Player</p>
+  <hr>
+
+  <p class="question">
+    Have you used VLC? What do you know about it?
+  </p>
+  <hr>
+
+  <details>
+    <summary>Slide 5</summary>
+    <ul>
+      <li><p>Free, open‑source multimedia player</p></li>
+      <li><p>Plays many audio/video formats (and can convert some formats)</p></li>
+      <li><p>Helpful for English learning: replay, slow down audio, loop short sections</p></li>
+    </ul>
+  </details>
+
+  <div class="footer">Presented by: Eltayeb Ali Abdalla Mohamed – SEN Teacher</div>
+  <div class="slide-number"></div>
+</div>
+
+<!-- ===== SLIDE 6 (Content accuracy tightened) ===== -->
+<div class="slide-container" data-title="Audacity">
+  <img src="ksu_logo.png" class="logo" alt="KSU logo">
+
+  <p class="slide-title">Audacity</p>
+  <hr>
+
+  <p class="question">
+    Have you used Audacity? What do you know about it?
+  </p>
+  <hr>
+
+  <details>
+    <summary>Slide 6</summary>
+    <ul>
+      <li><p>Free software for recording and editing audio</p></li>
+      <li><p>Allows teachers to <strong>chunk</strong> audio into short sections</p></li>
+      <li><p>Supports learners who need more processing time</p></li>
+      <li><p>Can improve memory and comprehension with repeated short listening</p></li>
+      <li><p>Can reduce cognitive load and listening fatigue by using shorter clips</p></li>
+    </ul>
+  </details>
+
+  <div class="footer">Presented by: Eltayeb Ali Abdalla Mohamed – SEN Teacher</div>
+  <div class="slide-number"></div>
+</div>
+
+<!-- ===== SLIDE 7 (ARIA corrected for accuracy) ===== -->
+<div class="slide-container" data-title="HTML5 and ARIA 1">
+  <img src="ksu_logo.png" class="logo" alt="KSU logo">
+
+  <p class="slide-title">HTML5 & ARIA</p>
+  <hr>
+
+  <p class="question">
+    ARIA (Accessible Rich Internet Applications) can enhance web accessibility for screen reader users.
+    Key benefits include:
+  </p>
+  <hr>
+
+  <details>
+    <summary>Slide 7</summary>
+    <ol>
+      <li><p>ARIA can provide an accessible name/label when visible text is not enough.</p></li>
+      <li><p>ARIA can specify roles, states, and properties (e.g., expanded/collapsed) for UI components.</p></li>
+      <li><p>For dynamic updates, use patterns such as ARIA live regions to announce changes.</p></li>
+    </ol>
+  </details>
+
+  <div class="footer">Presented by: Eltayeb Ali Abdalla Mohamed – SEN Teacher</div>
+  <div class="slide-number"></div>
+</div>
+
+<!-- ===== SLIDE 8 (ARIA corrected for accuracy) ===== -->
+<div class="slide-container" data-title="HTML5 and ARIA 2">
+  <img src="ksu_logo.png" class="logo" alt="KSU logo">
+
+  <p class="slide-title">HTML5 & ARIA</p>
+  <hr>
+
+  <p class="question">
+    More ARIA benefits:
+  </p>
+  <hr>
+
+  <details>
+    <summary>Slide 8</summary>
+    <ol start="4">
+      <li><p>Helps make custom controls (like sliders or tabs) accessible when implemented correctly.</p></li>
+      <li><p>Improves compatibility across assistive technologies.</p></li>
+      <li><p>Can communicate form validation errors to screen readers with proper patterns.</p></li>
+    </ol>
+  </details>
+
+  <div class="footer">Presented by: Eltayeb Ali Abdalla Mohamed – SEN Teacher</div>
+  <div class="slide-number"></div>
+</div>
+
+<!-- ===== SLIDE 9 (Fix duplicate numbering: your original had two "Slide 9") ===== -->
+<div class="slide-container" data-title="CSS for Inclusive Design">
+  <img src="ksu_logo.png" class="logo" alt="KSU logo">
+
+  <p class="slide-title">CSS for Inclusive Design</p>
+  <hr>
+
+  <p class="question">
+    How can CSS support inclusive design?
+  </p>
+  <hr>
+
+  <details>
+    <summary>Slide 9</summary>
+    <ul>
+      <li><p>Controls layout, font size, spacing, and color contrast</p></li>
+      <li><p>Creates responsive pages for different devices</p></li>
+      <li><p>Improves readability and accessibility</p></li>
+    </ul>
+  </details>
+
+  <div class="footer">Presented by: Eltayeb Ali Abdalla Mohamed – SEN Teacher</div>
+  <div class="slide-number"></div>
+</div>
+
+<!-- ===== SLIDE 10 (Your original "JavaScript & TTS" was labeled Slide 9; corrected to Slide 10) ===== -->
+<div class="slide-container" data-title="JavaScript and TTS">
+  <img src="ksu_logo.png" class="logo" alt="KSU logo">
+
+  <p class="slide-title">JavaScript & TTS</p>
+  <hr>
+
+  <p class="question">
+    How can Text-to-Speech help learners?
+  </p>
+  <hr>
+
+  <details>
+    <summary>Slide 10</summary>
+    <ol>
+      <li><p>Converts text into speech</p></li>
+      <li><p>Allows choice of voice, control of speech rate, and volume</p></li>
+      <li><p>Supports learners with visual impairment and reading difficulties</p></li>
+    </ol>
+  </details>
+
+  <div class="footer">Presented by: Eltayeb Ali Abdalla Mohamed – SEN Teacher</div>
+  <div class="slide-number"></div>
+</div>
+
+<!-- ===== SLIDE 11 ===== -->
+<div class="slide-container" data-title="JavaScript in Education">
+  <img src="ksu_logo.png" class="logo" alt="KSU logo">
+
+  <p class="slide-title">JavaScript in Education</p>
+  <hr>
+
+  <p class="question">
+    Why use JavaScript in education?
+  </p>
+  <hr>
+
+  <details>
+    <summary>Slide 11</summary>
+    <ol>
+      <li><p>Enables interactive learning exercises</p></li>
+      <li><p>Provides instant feedback for learners</p></li>
+      <li><p>Supports adaptive and engaging learning activities</p></li>
+    </ol>
+  </details>
+
+  <div class="footer">Presented by: Eltayeb Ali Abdalla Mohamed – SEN Teacher</div>
+  <div class="slide-number"></div>
+</div>
+
+<!-- ===== SLIDE 12 ===== -->
+<div class="slide-container" data-title="JavaScript Interactive Web Pages">
+  <img src="ksu_logo.png" class="logo" alt="KSU logo">
+
+  <p class="slide-title">JavaScript - Interactive Web pages</p>
+  <hr>
+
+  <p class="question">
+    How do interactive pages support learning?
+  </p>
+  <hr>
+
+  <details>
+    <summary>Slide 12</summary>
+    <ol>
+      <li><p>Enables interactive learning exercises</p></li>
+      <li><p>Provides instant feedback for learners</p></li>
+      <li><p>Supports adaptive and engaging learning activities</p></li>
+    </ol>
+  </details>
+
+  <div class="footer">Presented by: Eltayeb Ali Abdalla Mohamed – SEN Teacher</div>
+  <div class="slide-number"></div>
+</div>
+
+<!-- ===== SLIDE 13 (Spelling corrected: Language) ===== -->
+<div class="slide-container" data-title="SSML">
+  <img src="ksu_logo.png" class="logo" alt="KSU logo">
+
+  <p class="slide-title">Speech Synthesis Markup Language (SSML)</p>
+  <hr>
+
+  <p class="question">
+    What is SSML for?
+  </p>
+  <hr>
+
+  <details>
+    <summary>Slide 13</summary>
+    <ol>
+      <li><p>Adds pauses and more natural speech flow</p></li>
+      <li><p>Emphasizes important words (and can help with pronunciation)</p></li>
+      <li><p>Improves listening comprehension and can reduce stress</p></li>
+    </ol>
+  </details>
+
+  <div class="footer">Presented by: Eltayeb Ali Abdalla Mohamed – SEN Teacher</div>
+  <div class="slide-number"></div>
+</div>
+
+<!-- ===== Controls (Added: search box + clickable navigation) ===== -->
+<div class="controls" role="group" aria-label="Presentation controls">
+  <button type="button" id="prevBtn" aria-label="Previous slide">◀</button>
+  <button type="button" id="nextBtn" aria-label="Next slide">▶</button>
+
+  <div class="jump">
+    <label for="jumpBox">Go to:</label>
+    <input id="jumpBox" type="text" placeholder="e.g., 7 or ARIA or SSML" autocomplete="off" />
+    <span class="hint">Enter ↵ (G to focus)</span>
+  </div>
+</div>
+
+<div class="progress" aria-hidden="true"><div id="progressBar"></div></div>
+
+<script>
+let currentSlide = 0;
+
+function getSlides(){
+  return Array.from(document.querySelectorAll(".slide-container"));
+}
+
+/* Toast message (optional) */
+function toast(msg){
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  window.clearTimeout(toast._t);
+  toast._t = window.setTimeout(() => el.classList.remove("show"), 1200);
+}
+
+function updateSlideNumbers(){
+  const slides = getSlides();
+  slides.forEach((slide, index) => {
+    const box = slide.querySelector(".slide-number");
+    if (box) box.textContent = "Slide " + (index + 1) + " of " + slides.length;
+  });
+}
+
+function updateProgress(){
+  const slides = getSlides();
+  const pct = ((currentSlide + 1) / slides.length) * 100;
+  document.getElementById("progressBar").style.width = pct + "%";
+}
+
+function showSlide(index){
+  const slides = getSlides();
+  if (index < 0 || index >= slides.length) return;
+
+  slides.forEach(slide => {
+    slide.classList.remove("active");
+    // Close open <details> when moving slides
+    slide.querySelectorAll("details[open]").forEach(d => d.removeAttribute("open"));
+  });
+
+  slides[index].classList.add("active");
+  currentSlide = index;
+  updateProgress();
+}
+
+function nextSlide(){
+  const slides = getSlides();
+  if(currentSlide < slides.length - 1){
+    showSlide(currentSlide + 1);
+  } else {
+    toast("Last slide");
+  }
+}
+
+function prevSlide(){
+  if(currentSlide > 0){
+    showSlide(currentSlide - 1);
+  } else {
+    toast("First slide");
+  }
+}
+
+/* ===== Search / jump (WORKING) ===== */
+function normalize(s){
+  return (s || "").toLowerCase().trim();
+}
+
+function jumpTo(query){
+  const q = normalize(query);
+  if (!q) return false;
+
+  const slides = getSlides();
+
+  // Accept numbers: "7", also "slide 7" or "#7"
+  const numMatch = q.match(/(\d+)/);
+  if (/^\d+$/.test(q) || q.startsWith("slide") || q.startsWith("#")){
+    if (numMatch){
+      const n = parseInt(numMatch[1], 10);
+      if (!Number.isNaN(n) && n >= 1 && n <= slides.length){
+        showSlide(n - 1);
+        return true;
+      }
+    }
+  }
+
+  // Search by data-title or slide title text
+  for (let i = 0; i < slides.length; i++){
+    const t1 = normalize(slides[i].getAttribute("data-title"));
+    const t2 = normalize(slides[i].querySelector(".slide-title")?.textContent);
+    if (t1.includes(q) || t2.includes(q)){
+      showSlide(i);
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/* Controls wiring */
+document.getElementById("nextBtn").addEventListener("click", nextSlide);
+document.getElementById("prevBtn").addEventListener("click", prevSlide);
+
+const jumpBox = document.getElementById("jumpBox");
+jumpBox.addEventListener("keydown", (e) => {
+  if (e.key === "Enter"){
+    const ok = jumpTo(jumpBox.value);
+    if (ok){
+      toast("Jumped");
+      jumpBox.value = "";
+      jumpBox.blur();
+    } else {
+      toast("No match");
+    }
+  } else if (e.key === "Escape"){
+    jumpBox.value = "";
+    jumpBox.blur();
+  }
+});
+
+/* Keyboard navigation like PowerPoint */
+document.addEventListener("keydown", (e) => {
+  if (document.activeElement === jumpBox) return;
+
+  if (e.key === "ArrowRight" || e.key === "PageDown" || e.key === " "){
+    e.preventDefault();
+    nextSlide();
+  } else if (e.key === "ArrowLeft" || e.key === "PageUp"){
+    e.preventDefault();
+    prevSlide();
+  } else if (e.key === "Home"){
+    e.preventDefault();
+    showSlide(0);
+  } else if (e.key === "End"){
+    e.preventDefault();
+    showSlide(getSlides().length - 1);
+  } else if (e.key === "g" || e.key === "G"){
+    e.preventDefault();
+    jumpBox.focus();
+    jumpBox.select();
+    toast("Type slide number or title");
+  }
+});
+
+/* Click to move slides (clickable navigation)
+   - click left 1/3 of slide => previous
+   - click right 2/3 => next
+   - does NOT trigger when clicking interactive elements
+*/
+function isInteractive(el){
+  return !!el.closest("button, input, summary, details, a, textarea, select, label");
+}
+
+document.body.addEventListener("click", (e) => {
+  // Ignore clicks on the controls bar
+  if (e.target.closest(".controls")) return;
+
+  const active = document.querySelector(".slide-container.active");
+  if (!active) return;
+
+  // Only handle clicks inside the active slide
+  if (!active.contains(e.target)) return;
+
+  // Don't hijack clicks on interactive elements (details/summary etc.)
+  if (isInteractive(e.target)) return;
+
+  const rect = active.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const pct = x / rect.width;
+
+  if (pct < 0.33) prevSlide();
+  else nextSlide();
+});
+
+/* init */
+updateSlideNumbers();
+showSlide(0);
+</script>
+
+</body>
+</html>
+```
